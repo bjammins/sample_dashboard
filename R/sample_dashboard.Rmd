@@ -1,0 +1,402 @@
+---
+title: "Sample Executive Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(here)
+library(kableExtra)
+library(lubridate)
+library(tidyverse)
+library(stringr)
+library(forcats)
+library(lubridate)
+library(gridExtra)
+library(ggplot2)
+library(DT)
+library(magrittr)
+
+#read in data
+budget_data <- readr::read_csv(here::here("data", "budget_data.csv"))
+
+budget_data$Period <- as.factor(budget_data$Period)
+
+date <- Sys.Date() %>% format(., "%m/%d/%Y", tz = "UTC"-4)
+
+```
+
+Budget
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+
+### Net Income/(Loss) in $1,000s from Operations- Full-Year: 2017
+
+```{r}
+#calculate net income from operations for 2017
+act_rev_2017 <- budget_data %>% filter(Period == 2017, category == "Actual", type == "revenue", time == "Year-End") %>% select(dollars)
+
+act_exp_2017 <- budget_data %>% filter(Period == 2017, category == "Actual", type == "expenses", time == "Year-End") %>% select(dollars)
+
+
+ni_2017 <- act_rev_2017 - act_exp_2017
+valueBox(ni_2017, icon = "fa-dollar")
+```
+
+### Budgeted Net Income/(Loss) in $1,000s from Operations- Full-Year: (as of ```r date```)
+
+```{r}
+#calculate budgeted net income from operations in 2018
+bud_rev_2018 <- budget_data %>% filter(Period == 2018, category == "Budget", type == "revenue", time == "Year-End") %>% select(dollars)
+
+bud_exp_2018 <- budget_data %>% filter(Period == 2018, category == "Budget", type == "expenses", time == "Year-End") %>% select(dollars)
+
+ni_2018_budget <- bud_rev_2018 - bud_exp_2018
+valueBox(ni_2018_budget, icon = "fa-dollar")
+```
+
+
+
+### Net Income/(Loss) in $1,000s from Operations- YTD: (as of ```r date```)
+
+```{r}
+
+#calculate YTD net income from operations
+act_rev_2018 <- budget_data %>% filter(Period == 2018, category == "Actual", type == "revenue", time == "Year-to-Date") %>% select(dollars)
+
+act_exp_2018 <- budget_data %>% filter(Period == 2018, category == "Actual", type == "expenses", time == "Year-to-Date") %>% select(dollars)
+
+ni_2018_ytd <- act_rev_2018 - act_exp_2018
+
+valueBox(ni_2018_ytd, icon = "fa-dollar")
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Revenue (as of ```r date```)
+
+```{r}
+#graph revenue in 2017 and 2018
+budget_data_rev <- budget_data %>% filter(type == "revenue") %>% mutate(category = factor(category, levels = c("Budget", "Actual")))
+
+p <- ggplot(budget_data_rev)
+p <- p + geom_bar(aes(x=Period, y = dollars, fill = category), stat="identity", position = "dodge", width = 0.4) + facet_grid(~time)
+p <- p + labs(x = "Year", y = "Revenue ($1,000s)") + scale_y_continuous(breaks = c(0,2500,5000,7500,10000,12500,15000, 17500)) + expand_limits(y = 18000) + theme_minimal() + guides(fill = guide_legend(title = NULL))
+p <- p + scale_fill_manual("category", values = c("Actual" = "black", "Budget" = "gray")) + theme_bw()
+p <- p + theme(axis.text.x=element_text(size=18, color = "black", face = "bold"),
+               axis.ticks.x=element_blank(),
+               axis.title.x = element_text(size=18, color = "black", face = "bold"),
+               axis.title.y=element_text(face = "bold", size = 14),
+               axis.text.y=element_text(color="black", size = 12, face = "bold"),
+               axis.ticks.y=element_blank(),
+               panel.grid.major = element_line(colour = "black"),
+               panel.grid.minor = element_line(colour = "black")
+)
+p
+
+```
+
+### Expenses (as of ```r date```)
+
+```{r}
+budget_data_exp <- budget_data %>% filter(type == "expenses") %>% mutate(category = factor(budget_data_rev$category, levels = c("Budget", "Actual")))
+
+p <- ggplot(budget_data_exp)
+p <- p + geom_bar(aes(x=Period, y = dollars, fill = category), stat="identity", position = "dodge", width = 0.4) + facet_grid(~time)
+p <- p + labs(x = "Year", y = "Expenses ($1,000s)") + scale_y_continuous(breaks = c(0,2500,5000,7500,10000,12500,15000, 17500)) + expand_limits(y = 18000) + theme_minimal() + guides(fill = guide_legend(title = NULL))
+p <- p + scale_fill_manual("category", values = c("Actual" = "black", "Budget" = "gray")) + theme_bw()
+p <- p + theme(axis.text.x=element_text(size=18, color = "black", face = "bold"),
+               axis.ticks.x=element_blank(),
+               axis.title.x = element_text(size=18, color = "black", face = "bold"),
+               axis.title.y=element_text(face = "bold", size = 14),
+               axis.text.y=element_text(color="black", size = 12, face = "bold"),
+               axis.ticks.y=element_blank(),
+               panel.grid.major = element_line(colour = "black"),
+               panel.grid.minor = element_line(colour = "black")
+)
+p
+```
+
+
+Product Sales Details
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+
+###Sample Product Sales by Product Type (as of ```r date```)
+```{r, fig.width=10, fig.height=7}
+
+total_sales <- readr::read_csv(here::here("data", "total_sales.csv"))
+
+total_sales %<>% mutate(type = as.character(type), category = as.character(category), TransactionDate = as.Date(TransactionDate, format = "%m/%d/%y"))
+
+
+total_sales<- total_sales %>% mutate(transaction_year = year(TransactionDate), type = replace(type, type == "hardcopy", "Hardcopy Products"), type = replace(type, type == "electronic", "Electronic Products"))
+
+type_total <- total_sales %>% group_by(transaction_year, type) %>% summarise(total = sum(price))
+
+#arrange longwise
+type_total <- spread(type_total, transaction_year, total)
+
+type_total$Total <- type_total %>% select(`2016`, `2017`, `2018`) %>% rowSums()
+
+#sum columns
+type_total_sum <- type_total %>% select(c(`2016`, `2017`, `2018`, `Total`)) %>% summarise_all(funs(sum))
+
+type_sales <- bind_rows(type_total, type_total_sum) 
+
+type_sales <- type_sales %>% replace_na(list(type = "Total"))
+
+names(type_sales)[1] <- "Product Type"
+
+
+summary_sales <- datatable(type_sales, options = list(dom = 't')) %>% formatCurrency(c("2016", "2017", "2018", "Total"), currency = "$", interval = 3, mark = ",", 
+               digits = 2, dec.mark = getOption("OutDec"), before = TRUE) %>%
+  formatStyle(0, target = "row", fontWeight = styleEqual(dim(type_sales)[1], "bold")) %>% formatStyle(columns = c(1, 2, 3, 4, 5), fontSize = '88%')
+
+
+summary_sales
+```
+
+
+###Sample Electronic Sales Detail (as of ```r date```) 
+```{r, fig.width=10, fig.height=7}
+elec_total <- total_sales %>% filter(type == "Electronic Products") %>% group_by(transaction_year, category) %>% summarise(total = sum(price))
+
+
+#arrange longwise
+elec_total <- spread(elec_total, transaction_year, total, fill = 0)
+
+#replace Nas with zeros
+elec_total <- elec_total %>% replace_na(list("2016" = 0))
+
+elec_total$Total <- elec_total %>% select(`2016`, `2017`, `2018`) %>% rowSums()
+
+#sum columns
+elec_total_sum <- elec_total %>% select(c(`2016`, `2017`, `2018`, `Total`)) %>% summarise_all(funs(sum))
+
+elec_sales <- bind_rows(elec_total, elec_total_sum) 
+
+elec_sales$category <- as.character(elec_sales$category)
+elec_sales <- elec_sales %>% replace_na(list(category = "Total"))
+
+names(elec_sales)[1] <- "Electronic Products"
+
+
+elec_summary_sales <- datatable(elec_sales, options = list(dom = 't', pageLength = dim(elec_sales)[1])) %>% formatCurrency(c("2016", "2017", "2018", "Total"), currency = "$", interval = 3, mark = ",", digits = 2, dec.mark = getOption("OutDec"), before = TRUE) %>%
+  formatStyle(0, target = "row", fontWeight = styleEqual(dim(elec_sales)[1], "bold")) %>% formatStyle(columns = c(1, 2, 3, 4, 5), fontSize = '88%')
+
+elec_summary_sales
+
+
+```
+
+###Sample Hardcopy Products Sales Detail (as of ```r date```) 
+```{r, fig.width=10, fig.height=7}
+#Summary product sales by product type
+
+hardcopy_total <- total_sales %>% filter(type == "Hardcopy Products") %>% group_by(transaction_year, category) %>% summarise(total = sum(price))
+
+
+#arrange longwise
+hardcopy_total <- spread(hardcopy_total, transaction_year, total, fill = 0) %>%
+  mutate(Total = select(., `2016`, `2017`, `2018`) %>% rowSums())
+
+#sum columns
+hardcopy_total_sum <- hardcopy_total %>% select(c(`2016`, `2017`, `2018`, `Total`)) %>% summarise_all(funs(sum))
+
+hardcopy_sales <- bind_rows(hardcopy_total, hardcopy_total_sum) 
+
+hardcopy_sales$category <- as.character(hardcopy_sales$category)
+hardcopy_sales <- hardcopy_sales %>% replace_na(list(category = "Total"))
+
+names(hardcopy_sales)[1] <- "Hardcopy Products"
+
+
+hardcopy_summary_sales <- datatable(hardcopy_sales, options = list(dom = 't', pageLength = dim(hardcopy_sales) [1])) %>% formatCurrency(c("2016", "2017", "2018", "Total"), currency = "$", interval = 3, mark = ",", digits = 2, dec.mark = getOption("OutDec"), before = TRUE) %>%
+  formatStyle(0, target = "row", fontWeight = styleEqual(dim(hardcopy_sales) [1], "bold")) %>% formatStyle(columns = c(1, 2, 3, 4, 5), fontSize = '88%')
+
+hardcopy_summary_sales
+```
+
+Membership & Engagement
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Number of Members (as of ```r date```)
+
+```{r}
+member_numbers <- 55217
+valueBox(member_numbers, icon = "fa-user")
+```
+
+
+### Number of Members Needed to Reach 2018 Membership Goal (as of ```r date```)
+
+```{r}
+members_needed_2018 <- (58000 - member_numbers)
+valueBox(members_needed_2018, icon = "fa-user")
+```
+
+
+### YOY Membership Growth May 2017 to May 2018 (as of ```r date```)
+
+```{r}
+member_growth <-paste(round((55217 - 51287)/51287*100,2), "%", sep ="")
+valueBox(member_growth, icon = "fa-percent")
+```
+
+
+### Average Retention Rate: New Members (as of ```r date```)
+
+```{r}
+new_member_retention_rate <- "71.4%"
+valueBox(new_member_retention_rate, icon = "fa-percent")
+```
+
+
+### Average Retention Rate: All Members (as of ```r date```)
+
+```{r}
+new_member_retention_rate <- "80.8%"
+valueBox(new_member_retention_rate, icon = "fa-percent")
+```
+
+### Number of Annual Meeting Registrations (as of ```r date```)
+
+```{r}
+convention_numbers <- 10982
+valueBox(convention_numbers, icon = "fa-user")
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+### Sample Annual Meeting Data (as of ```r date```)
+
+```{r}
+#create the convention df
+convention_data <- data.frame("Period" = c("2017",  "2018"),   "Registrations" = c(9921, 10982))
+
+# graph the donations
+p <- ggplot(convention_data)
+p <- p + geom_bar(aes(x=Period, y = Registrations), stat="identity", width = 0.4, fill = "black")
+p <- p + labs(x = "Year", y = "Registrations") + scale_y_continuous(breaks = c(0,2000, 4000, 6000, 8000, 10000, 120000)) + expand_limits(y=12000) + theme_minimal()
+p <- p + theme(axis.text.x=element_text(size=18, color = "black", face = "bold"),
+               axis.ticks.x=element_blank(),
+               axis.title.x = element_text(size=18, color = "black", face = "bold"),
+               axis.title.y=element_text(face = "bold", size = 14),
+               axis.text.y=element_text(color="black", size = 12, face = "bold"),
+               axis.ticks.y=element_blank(), 
+               panel.grid.major = element_line(colour = "black"),
+               panel.grid.minor = element_line(colour = "black"))
+               
+p
+```
+
+
+### Sample Social Media Engagement (as of ```r date```)
+
+```{r}
+social.media <- function(sm.data){
+  
+  gg <- ggplot(sm.data) 
+  gg <- gg + geom_col(aes(x=reorder(type, -pct_increase), y = pct_increase), fill = "black", width = 0.4) 
+  gg <- gg + coord_flip() + theme_minimal()
+  gg <- gg + annotate("segment", y = 5, yend = 5, x= 0.25, xend = 4.25, color = "blue", size = 1.5)
+  gg <- gg + annotate("text", x = 4.5, y = 5, label = "Annual Goal")
+  gg <- gg + annotate("text", x = 4.1, y = 14, label = "Followers: 57,598", size = 5)
+  gg <- gg + annotate("text", x = 3.1, y = 16, label = "Followers: 8,071", size = 5)
+  gg <- gg + annotate("text", x = 2.1, y = 23, label = "Followers: 12,187", size = 5)
+  gg <- gg + annotate("text", x = 1.1, y = 29, label = "Followers: 1,100", size = 5)
+  gg <- gg + scale_y_continuous(breaks = c(0,10,20,30, 40)) + expand_limits(y=45)
+  gg <- gg + labs(x = "", y = "Percent increase in followers since Jan 2018")
+  gg <- gg + theme(axis.text.x=element_text(size=14, color = "black", face = "bold"),
+                   axis.ticks.x=element_blank(),
+                   axis.title.x = element_text(size=12, color = "black"),
+                   axis.title.y=element_text(face = "bold", size = 14),
+                   axis.text.y=element_text(color="black", size = 12, face = "bold"),
+                   panel.grid.major = element_line(colour = "black")
+  )
+  gg
+}
+
+sm.data <- data.frame("type" = c("Instagram", "Facebook", "Twitter", "LinkedIn"), "pct_increase" =c(13.7, 7.2, 4.4, 18.5), "total_followers"=c(1100, 51111, 6057, 14917))
+
+social.media(sm.data)
+
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Sample Free Resources Obtained (as of ```r date```)
+
+```{r}
+
+
+free_member_data <- readr::read_csv(here::here("data", "free_member_resources_received.csv"))
+free_member_data$Transaction.Date <- as.Date(free_member_data$Transaction.Date, format = "%m/%d/%y")
+free_member_data <- free_member_data %>% mutate(transaction_year = year(Transaction.Date))
+free_member_data$transaction_year <- as.factor(free_member_data$transaction_year)
+
+p <- ggplot(free_member_data)
+p <- p + geom_bar(aes(x=transaction_year, fill = type), position= "stack", width = 0.4) + guides(fill = guide_legend(title = NULL))
+p <- p + labs(x = "Year", y = "Number of Free Resources", fill='Resource Type')  + scale_y_continuous(breaks = c(0,100,200,300, 400)) + expand_limits(y=400)  + theme_minimal()
+p <- p + scale_fill_manual("type", values = c("electronic" = "black", "hardcopy" = "gray"))
+p <- p + theme(axis.text.x=element_text(size=18, color = "black", face = "bold"),
+               axis.ticks.x=element_blank(),
+               axis.title.x = element_text(size=18, color = "black", face = "bold"),
+               axis.title.y=element_text(face = "bold", size = 14),
+               axis.text.y=element_text(color="black", size = 12, face = "bold"),
+               axis.ticks.y=element_blank(),
+               legend.text = element_text(colour="black", size = 18),
+               panel.grid.major = element_line(colour = "black"),
+               panel.grid.minor = element_line(colour = "black"))
+
+p
+
+
+```
+
+### Sample Donations Data (as of ```r date```)
+```{r}
+#create the donations df
+donation_data <- data.frame("Period" = c("2017", "2017", "2017", "2018", "2018", "2018", "2018"), "category" = c("Received", "Donors", "Donations", "Received", "Pledged", "Donors", "Donations"),   "dollars" = c(100000, 305, 2005, 41800, 18000, 289, 629))
+don_dollars <- donation_data %>% filter(category %in% c("Received", "Pledged"))
+other_data <- donation_data %>% filter(category %in% c("Donors", "Donations"))
+other_data <- other_data %>% rename(number = dollars)
+spread_other_data <- other_data %>% spread(category, number)
+
+# graph the donations
+p <- ggplot(don_dollars)
+p <- p + geom_bar(aes(x=Period, y = dollars, fill = category), stat="identity", width = 0.4)
+p <- p + annotation_custom(tableGrob(spread_other_data, rows=NULL), 
+                           xmin=2, xmax=2, ymin=100000, ymax=120000)
+p <- p + labs(x = "Year", y = "Revenue ($)") + ylim(0, 150000) + theme_minimal()
+p <- p + scale_fill_manual("category", values = c("Received" = "black", "Pledged" = "gray")) + guides(fill = guide_legend(title = NULL))
+p <- p + theme(axis.text.x=element_text(size=18, color = "black", face = "bold"),
+               axis.ticks.x=element_blank(),
+               axis.title.x = element_text(size=18, color = "black", face = "bold"),
+               axis.title.y=element_text(face = "bold", size = 14),
+               axis.text.y=element_text(color="black", size = 12, face = "bold"),
+               axis.ticks.y=element_blank(),
+               legend.text = element_text(colour="black", size = 18),
+               panel.grid.major = element_line(colour = "black"),
+               panel.grid.minor = element_line(colour = "black")
+               
+)
+p
+```
+
