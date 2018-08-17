@@ -24,7 +24,8 @@ budget_data <- readr::read_csv(here::here("data", "budget_data.csv"))
 
 budget_data$Period <- as.factor(budget_data$Period)
 
-date <- Sys.Date() %>% format(., "%m/%d/%Y", tz = "UTC"-4)
+#set date for dashboard
+date <- Sys.Date() %>% format(., "%m/%d/%Y")
 
 ```
 
@@ -171,7 +172,6 @@ summary_sales
 ```{r, fig.width=10, fig.height=7}
 elec_total <- total_sales %>% filter(type == "Electronic Products") %>% group_by(transaction_year, category) %>% summarise(total = sum(price))
 
-
 #arrange longwise
 elec_total <- spread(elec_total, transaction_year, total, fill = 0)
 
@@ -195,8 +195,6 @@ elec_summary_sales <- datatable(elec_sales, options = list(dom = 't', pageLength
   formatStyle(0, target = "row", fontWeight = styleEqual(dim(elec_sales)[1], "bold")) %>% formatStyle(columns = c(1, 2, 3, 4, 5), fontSize = '88%')
 
 elec_summary_sales
-
-
 ```
 
 ###Sample Hardcopy Products Sales Detail (as of ```r date```) 
@@ -204,7 +202,6 @@ elec_summary_sales
 #Summary product sales by product type
 
 hardcopy_total <- total_sales %>% filter(type == "Hardcopy Products") %>% group_by(transaction_year, category) %>% summarise(total = sum(price))
-
 
 #arrange longwise
 hardcopy_total <- spread(hardcopy_total, transaction_year, total, fill = 0) %>%
@@ -219,7 +216,6 @@ hardcopy_sales$category <- as.character(hardcopy_sales$category)
 hardcopy_sales <- hardcopy_sales %>% replace_na(list(category = "Total"))
 
 names(hardcopy_sales)[1] <- "Hardcopy Products"
-
 
 hardcopy_summary_sales <- datatable(hardcopy_sales, options = list(dom = 't', pageLength = dim(hardcopy_sales) [1])) %>% formatCurrency(c("2016", "2017", "2018", "Total"), currency = "$", interval = 3, mark = ",", digits = 2, dec.mark = getOption("OutDec"), before = TRUE) %>%
   formatStyle(0, target = "row", fontWeight = styleEqual(dim(hardcopy_sales) [1], "bold")) %>% formatStyle(columns = c(1, 2, 3, 4, 5), fontSize = '88%')
@@ -236,6 +232,7 @@ Row
 ### Number of Members (as of ```r date```)
 
 ```{r}
+#numbers are entered manually for sample purposes
 member_numbers <- 55217
 valueBox(member_numbers, icon = "fa-user")
 ```
@@ -244,6 +241,7 @@ valueBox(member_numbers, icon = "fa-user")
 ### Number of Members Needed to Reach 2018 Membership Goal (as of ```r date```)
 
 ```{r}
+#numbers are entered manually for sample purposes
 members_needed_2018 <- (58000 - member_numbers)
 valueBox(members_needed_2018, icon = "fa-user")
 ```
@@ -252,6 +250,7 @@ valueBox(members_needed_2018, icon = "fa-user")
 ### YOY Membership Growth May 2017 to May 2018 (as of ```r date```)
 
 ```{r}
+#numbers are entered manually for sample purposes
 member_growth <-paste(round((55217 - 51287)/51287*100,2), "%", sep ="")
 valueBox(member_growth, icon = "fa-percent")
 ```
@@ -260,6 +259,7 @@ valueBox(member_growth, icon = "fa-percent")
 ### Average Retention Rate: New Members (as of ```r date```)
 
 ```{r}
+#numbers are entered manually for sample purposes
 new_member_retention_rate <- "71.4%"
 valueBox(new_member_retention_rate, icon = "fa-percent")
 ```
@@ -268,6 +268,7 @@ valueBox(new_member_retention_rate, icon = "fa-percent")
 ### Average Retention Rate: All Members (as of ```r date```)
 
 ```{r}
+#numbers are entered manually for sample purposes
 new_member_retention_rate <- "80.8%"
 valueBox(new_member_retention_rate, icon = "fa-percent")
 ```
@@ -275,6 +276,7 @@ valueBox(new_member_retention_rate, icon = "fa-percent")
 ### Number of Annual Meeting Registrations (as of ```r date```)
 
 ```{r}
+#numbers are entered manually for sample purposes
 convention_numbers <- 10982
 valueBox(convention_numbers, icon = "fa-user")
 ```
@@ -286,6 +288,7 @@ Row
 ### Sample Annual Meeting Data (as of ```r date```)
 
 ```{r}
+#numbers are entered manually for sample purposes
 #create the convention df
 convention_data <- data.frame("Period" = c("2017",  "2018"),   "Registrations" = c(9921, 10982))
 
@@ -344,9 +347,8 @@ Row
 ### Sample Free Resources Obtained (as of ```r date```)
 
 ```{r}
-
-
 free_member_data <- readr::read_csv(here::here("data", "free_member_resources_received.csv"))
+#set date format
 free_member_data$Transaction.Date <- as.Date(free_member_data$Transaction.Date, format = "%m/%d/%y")
 free_member_data <- free_member_data %>% mutate(transaction_year = year(Transaction.Date))
 free_member_data$transaction_year <- as.factor(free_member_data$transaction_year)
